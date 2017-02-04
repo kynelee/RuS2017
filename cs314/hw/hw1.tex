@@ -1,0 +1,98 @@
+\documentclass{article}
+\usepackage[margin=1.0in]{geometry}
+
+\begin{document}
+\noindent
+Matthew Lee\\
+Principles of Programming Languages Homework 1\\
+Section 02\\
+\section{}
+  \subsection{$f(x) = x + 1, x > 0$}
+    \paragraph{Rules}
+      \begin{enumerate}
+        \item $\$ \rightarrow |$
+        \item $|\# \rightarrow |$
+      \end{enumerate}
+    \paragraph{Sequence}
+      \begin{enumerate}
+        \item $\$|||\# \rightarrow ||||\#$ (Rule 1)
+        \item $||||\# \rightarrow ||||$ (Rule 2)
+      \end{enumerate}
+  \subsection{$f(x) = 2x, x > 0$}
+    \paragraph{Rules}
+      \begin{enumerate}
+        \item $| \rightarrow ||$
+        \item $\$| \rightarrow |$
+        \item $|\# \rightarrow |$
+      \end{enumerate}
+    \paragraph{Sequence}
+      \begin{enumerate}
+        \item $\$|||\# \rightarrow \$||||||\#$ (Rule 1)
+        \item $\$||||||\# \rightarrow ||||||\#$ (Rule 2)
+        \item $||||||\# \rightarrow ||||||$ (Rule 3)
+      \end{enumerate}
+  \subsection{$ f(x, y) = x + y, x,y > 0 $}
+    \paragraph{Rules}
+      \begin{enumerate}
+        \item $ \& \rightarrow NULL $
+        \item $ \$| \rightarrow | $
+        \item $ |\# \rightarrow | $
+      \end{enumerate}
+    \paragraph{Sequence}
+      \begin{enumerate}
+        \item $ \$||\&|||\# \rightarrow \$||||| $(Rule 1)
+        \item $\$|||||\# \rightarrow |||||\# $(Rule 2)
+        \item $|||||\# \rightarrow ||||| $ (Rule 3)
+      \end{enumerate}
+\section{}
+  \subsection{Rules}
+      \begin{enumerate}
+        \item $ (0 + 0)  \rightarrow 0 $
+        \item $ (0 + 1) \rightarrow 1 $
+        \item $ (1 + 0) \rightarrow 1 $
+        \item $ (0 + 2) \rightarrow 2 $
+        \item $ (2 + 0) \rightarrow 2 $
+        \item $ (1 + 1) \rightarrow 2 $
+        \item $ (1 + 2) \rightarrow 0 $
+        \item $ (2 + 1) \rightarrow 0 $
+        \item $ (2 + 2) \rightarrow 1 $
+      \end{enumerate}
+  \subsection{Sequence Example}
+      \paragraph{Sequence 1: $(0+(1+2))$}
+        \begin{enumerate}
+          \item $ ((1+2) + 0) \rightarrow (0 + 0) $ (Rule 7)
+          \item $ (0 + 0) \rightarrow 0 $ (Rule 1) 
+        \end{enumerate}
+      \paragraph{Sequence 2: $(1+(2+2))$}
+        \begin{enumerate}
+          \item $ (1 + (2 + 2)) \rightarrow (1 + 1) $ (Rule 9)
+          \item $ (1 + 1) \rightarrow 2 $ (Rule 6)
+        \end{enumerate}
+  \subsection{}
+    No, in $ ((1 + 1) + (2+2)) $ 2 rules can be applied
+
+\section{}
+    \subsection{}
+      Yes: $ r^+ = r\&r^* $
+    \subsection{}
+      No: At least one of those operators is necessary to express an
+      infinite quantity
+\section{}
+  $ R = (digit)^+.(digit)^+(\epsilon(digit)^+ | \epsilon) $
+
+\section{}
+  \subsection{}
+    All strings/combinations over the alphabet $ {a,b} $ including the empty string
+  \subsection{}
+    All strings over the alphabet $ {0, 1} $ which begin with 1 and end in
+    001 or 011
+\section{}
+  \subsection{}
+    $ R = (b^*c | a | c | d)^*b^* $
+  \subsection{}
+    $ R = a^*(b | \epsilon)a^*(c | \epsilon)a^*(c | \epsilon)a^*(c | \epsilon)a^*(c | \epsilon)a^* %
+    \\ | a^*(c | \epsilon)a^*(b | \epsilon)a^*(c | \epsilon)a^*(c | \epsilon)a^*(c | \epsilon)a^* %
+    \\ | a^*(c | \epsilon)a^*(c | \epsilon)a^*(b | \epsilon)a^*(c | \epsilon)a^*(c | \epsilon)a^* %
+    \\ | a^*(c | \epsilon)a^*(c | \epsilon)a^*(c | \epsilon)a^*(b | \epsilon)a^*(c | \epsilon)a^* %
+    \\ | a^*(c | \epsilon)a^*(c | \epsilon)a^*(c | \epsilon)a^*(c | \epsilon)a^*(b | \epsilon)a^* $
+\end{document}
