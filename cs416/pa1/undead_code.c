@@ -14,9 +14,9 @@
 
 void segment_fault_handler(int signum)
 {
-        void* p;
-        p = (void *) &signum; //Use the signum to construct a pointer to flag on stored stack
-        p += 0x4c-0x10; //Increment pointer down to the stored PC
+        printf("I am slain!\n");
+        void * p = (void *) &signum; //Use the signum to construct a pointer to flag on stored stack
+        p += 0x3c; //Increment pointer down to the stored PC
         *(int *)p += 0x6; //Increment value at pointer by length of bad instruction
 }
 
@@ -32,4 +32,3 @@ int main()
 
         return 0;
 }
-
