@@ -2,6 +2,8 @@
 #include <sys/time.h>
 
 void verify(MatrixInfo * mat, MatrixInfo * vec, MatrixInfo * result){
+  /* Verifies the result of SPMV done on GPU */
+
   float * product = (float *) calloc(vec->nz, sizeof(float));
   for(int i = 0; i < mat->nz; i ++){
     float val = mat->val[i];
@@ -10,8 +12,11 @@ void verify(MatrixInfo * mat, MatrixInfo * vec, MatrixInfo * result){
     float temp = vec->val[col] * val;
     product[row] += temp;
   }
-  printf("result size%d\n", result->nz);
+
+  printf("result size %d\n", result->nz);
   printf("result first %f\n", result->val[0]);
+
+  float error = 0;
 
   for(int i = 0; i < result->nz; i++){
     float product_val = product[i];
@@ -22,7 +27,13 @@ void verify(MatrixInfo * mat, MatrixInfo * vec, MatrixInfo * result){
       printf("Found error at vector line %d", i);
       break;
     }
+
+    if(product_val - result_val > error){
+      error = product_val - result_val;
+    }
   }
+
+  printf("All good, biggest error found was %f", error);
 }
 
 
@@ -93,7 +104,6 @@ void getMulAtomic(MatrixInfo * mat, MatrixInfo * vec, MatrixInfo * res, int bloc
 
 
     cudaMemcpy(res->val, y, vector_bytes, cudaMemcpyDeviceToHost);
-    cudaDeviceSynchronize();
 
     verify(mat, vec, res);
 
