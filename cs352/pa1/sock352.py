@@ -37,16 +37,16 @@ class socket:
         self.tx.sendall(init_packet)
         print(" Client sending init_packet = " + str(init_packet))
 
-        while True:
-          amount_received = 0
-          amount_expected = len(init_packet)
-          response_packet = []
+        amount_received = 0
+        amount_expected = len(init_packet)
+        response_packet = []
 
-          while(amount_received < amount_expected):
-            chunk = self.rx.recv(8)
-            response_packet.append(chunk)
-            amount_received += len(chunk)
-            response = "".join(response_packet)
+        while(amount_received < amount_expected):
+          print amount_received
+          chunk = self.rx.recv(amount_expected)
+          response_packet.append(chunk)
+          amount_received += len(chunk)
+          response = "".join(response_packet)
             
         response = init_struct.unpack(response) 
         flag = response[1]
@@ -64,18 +64,21 @@ class socket:
 
     def accept(self):
         while True:
-          clientsocket, address = self.rx.accept()
-          struct_format= struct.Struct('!BBHQQL') # version, flags, header_len, sqeuence_no, ack_no, payload_len
-          client_packet= struct_format.pack(1, 1, 24, random.randint(1,100), 0, 0)
+          clientreadsocket, address = self.rx.accept()
+          clientwritesocket, address = self.tx.accept()
+
+          struct_format = struct.Struct('!BBHQQL') # version, flags, header_len, sqeuence_no, ack_no, payload_len
+          client_packet = struct_format.pack(1, 1, 24, random.randint(1,100), 0, 0)
 
           amount_received = 0
           amount_expected = len(client_packet)
           init_packet = []
           
           print("got here")
+          print(self.rx)
 
           while(amount_received < amount_expected):
-            chunk = self.rx.recv(8)
+            chunk = clientreadsocket.recv(amount_expected)
             init_packet.append(chunk)
             amount_received += len(chunk)
 
@@ -83,14 +86,13 @@ class socket:
           response = struct_format.unpack(response)
 
           print("Server received init packet " + str(response))
+          clientwritesocket.sendall(struct_format.pack(response[0], 5, 24, random.randint(1,100), response[3] + 1, 0))
 
-          response[1] = 5
-          response[3] = random.randInt(1, 100)
-          response[4] = response[3] + 1
+          while True:
+              pass
 
-          print("Server sending response packet " + str(response))
-          self.tx.sendall(struct_format.pack(response))
           return(clientsocket, address)
+
 
 
 # TODO implement check for whether connection is open
