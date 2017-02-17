@@ -18,6 +18,9 @@ void verify(MatrixInfo * mat, MatrixInfo * vec, MatrixInfo * result){
 
   float error = 0;
 
+  printf("result size%d\n", result->nz);
+  printf("result first %f\n", result->val[0]);
+
   for(int i = 0; i < result->nz; i++){
     float product_val = product[i];
     float result_val = result->val[i];
@@ -104,6 +107,7 @@ void getMulAtomic(MatrixInfo * mat, MatrixInfo * vec, MatrixInfo * res, int bloc
 
 
     cudaMemcpy(res->val, y, vector_bytes, cudaMemcpyDeviceToHost);
+    cudaDeviceSynchronize();
 
     verify(mat, vec, res);
 
