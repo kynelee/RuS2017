@@ -65,8 +65,6 @@ def main():
     # create a socket and connect to the remote server
     s = sock352.socket()
     s.connect((destination,port))
-
-""" 
     
     # send the size of the file as a 4 byte integer
     # to the server, so it knows how much to read
@@ -113,9 +111,15 @@ def main():
     if (sent != len(digest)):
         raise RuntimeError("socket broken")
 
-    print ("client1: sent %d bytes in %0.6f seconds, %0.6f MB/s " % (filesize, lapsed_seconds, (filesize/lapsed_seconds)/(1024*1024)))
-"""
+    if (lapsed_seconds > 0.0):
+        print ("client1: sent %d bytes in %0.6f seconds, %0.6f MB/s " % (filesize, lapsed_seconds, (filesize/lapsed_seconds)/(1024*1024)))
+    else:
+        print ("client1: sent %d bytes in %d seconds, inf MB/s " % (filesize, lapsed_seconds))        
+
+    fd.close()
+    s.close()
 # this gives a main function in Python
 if __name__ == "__main__":
     main()
+
 

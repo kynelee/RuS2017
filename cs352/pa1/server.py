@@ -71,7 +71,6 @@ def main():
 
     # when accept returns, the client is connected 
     (s2,address) = s.accept() 
-"""
     # this receives the size of the file
     # as a 4 byte integer in network byte order (big endian)
     longPacker = struct.Struct("!L")
@@ -107,6 +106,7 @@ def main():
     digestlen = dl[0]
     remote_digest = s2.recv(digestlen)
 
+
     # check is the size matches 
     if (len(remote_digest) != digestlen):
         raise RuntimeError("socket error")
@@ -120,7 +120,6 @@ def main():
     print ("server1: received %d bytes in %0.6f seconds, %0.6f MB/s " % (filelen, lapsed_seconds, (filelen/lapsed_seconds)/(1024*1024)))
     fd.close()
     s2.close()
-"""
     
 
 # create a main function in Python
