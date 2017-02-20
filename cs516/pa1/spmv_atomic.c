@@ -1,9 +1,9 @@
 #include "genresult.cuh"
 #include <sys/time.h>
 
+
 void verify(MatrixInfo * mat, MatrixInfo * vec, MatrixInfo * result){
   /* Verifies the result of SPMV done on GPU */
-
   float * product = (float *) calloc(vec->nz, sizeof(float));
   for(int i = 0; i < mat->nz; i ++){
     float val = mat->val[i];
@@ -71,8 +71,8 @@ void getMulAtomic(MatrixInfo * mat, MatrixInfo * vec, MatrixInfo * res, int bloc
     int * coord_row;
     int * coord_col;
 
-    const unsigned int matrix_bytes = mat->nz * sizeof(float);
-    const unsigned int vector_bytes = vec->nz * sizeof(float);
+    const unsigned int matrix_bytes = (size_t) mat->nz * sizeof(float);
+    const unsigned int vector_bytes = (size_t) vec->nz * sizeof(float);
 
     cudaMalloc((float**)&A, matrix_bytes);
     cudaMemset(A, 0, matrix_bytes);
@@ -105,11 +105,9 @@ void getMulAtomic(MatrixInfo * mat, MatrixInfo * vec, MatrixInfo * res, int bloc
     clock_gettime(CLOCK_MONOTONIC_RAW, &end);
     printf("Atomic Kernel Time: %lu micro-seconds\n", 1000000 * (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1000);
 
-
     cudaMemcpy(res->val, y, vector_bytes, cudaMemcpyDeviceToHost);
-    cudaDeviceSynchronize();
 
-    verify(mat, vec, res);
+/*    verify(mat, vec, res);*/
 
     cudaFree(A);
     cudaFree(x);
