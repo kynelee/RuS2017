@@ -3,7 +3,8 @@
 
 
 void verify(MatrixInfo * mat, MatrixInfo * vec, MatrixInfo * result){
-  /* Verifies the result of SPMV done on GPU */
+  /* Verifies the result of SPMV done on GPU by sequentially doing it on the
+   * CPU */
   float * product = (float *) calloc(vec->nz, sizeof(float));
   for(int i = 0; i < mat->nz; i ++){
     float val = mat->val[i];
@@ -26,9 +27,8 @@ void verify(MatrixInfo * mat, MatrixInfo * vec, MatrixInfo * result){
     float result_val = result->val[i];
 
     if (product_val - result_val > .001){
-      printf("product %f result %f", product_val, result_val);
-      printf("Found error at vector line %d", i);
-      break;
+      printf("product %f result %f\n", product_val, result_val);
+      printf("Found error at vector line %d\n", i);
     }
 
     if(product_val - result_val > error){
@@ -47,7 +47,7 @@ __global__ void getMulAtomic_kernel(const int nnz,
                                     float * x, 
                                     float * y)
 {
-  int thread_id = blockDim.x  * blockIdx.x + threadIdx.x;
+  int thread_id = blockDim.x  * blockIdx.x + threadIdx.x; 
   int thread_num = blockDim.x * gridDim.x;
   int iter = nnz % thread_num ? nnz/thread_num + 1: nnz/thread_num;
 
@@ -107,7 +107,7 @@ void getMulAtomic(MatrixInfo * mat, MatrixInfo * vec, MatrixInfo * res, int bloc
 
     cudaMemcpy(res->val, y, vector_bytes, cudaMemcpyDeviceToHost);
 
-/*    verify(mat, vec, res);*/
+    verify(mat, vec, res);
 
     cudaFree(A);
     cudaFree(x);
