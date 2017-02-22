@@ -14,29 +14,18 @@ void verify(MatrixInfo * mat, MatrixInfo * vec, MatrixInfo * result){
     product[row] += temp;
   }
 
-  printf("result size %d\n", result->nz);
-  printf("result first %f\n", result->val[0]);
-
   float error = 0;
-
-  printf("result size%d\n", result->nz);
-  printf("result first %f\n", result->val[0]);
-
+  
   for(int i = 0; i < result->nz; i++){
     float product_val = product[i];
     float result_val = result->val[i];
-
-    if (product_val - result_val > .001){
-      printf("product %f result %f\n", product_val, result_val);
-      printf("Found error at vector line %d\n", i);
-    }
 
     if(product_val - result_val > error){
       error = product_val - result_val;
     }
   }
 
-  printf("All good, biggest error found was %f", error);
+  printf("Biggest error found was %f\n", error);
 }
 
 
@@ -107,6 +96,7 @@ void getMulAtomic(MatrixInfo * mat, MatrixInfo * vec, MatrixInfo * res, int bloc
 
     cudaMemcpy(res->val, y, vector_bytes, cudaMemcpyDeviceToHost);
 
+    printf("Running my own sequential verification on results\n");
     verify(mat, vec, res);
 
     cudaFree(A);
