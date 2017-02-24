@@ -136,26 +136,35 @@ class socket:
         return payload_len
 
 
-    def recv(self,bytes_to_receive):
+    def recv(self,bytes_to_receive): 
         if self.current_buffer: # Already data, just need to return in 
           if bytes_to_receive > len(self.current_buffer):
             data = self.current_buffer
             self.current_buffer = None
           else:           
             data = self.current_buffer[0:bytes_to_receive]
-            self.current_buffer = self.current_buffer[bytes_to_receive + 1:]
+            self.current_buffer = self.current_buffer[bytes_to_receive:]
             
           return data 
 
         else:
-          self.__sock352_get_packet() # Get another packet
           
+          while not self.current_buffer and self.client_closed == False:
+            try:
+              print("executing")
+              rx_socket.settimeout(.2)
+              self.__sock352_get_packet() # Get another packet
+            except syssock.timeout:
+              continue
+
+            rx_socket.settimeout(None)
+          
+
+
           data = self.current_buffer[0:bytes_to_receive]
           self.current_buffer = self.current_buffer[bytes_to_receive:len(self.current_buffer)]
 
           return data
-          # now our buffer should be filled, so call again
-          #return self.recv(bytes_to_receive)
          
 
        
@@ -216,35 +225,28 @@ class socket:
 
             except syssock.timeout:
               continue
-          settimeout()
-          
 
 
         else:
-
           seq_num = header[3]
           ack_num = header[4]
           payload = data 
           if (seq_num != self.seq_num) or payload_len != header[5]: # if ack is dropped or packet is malformed
-            print("GOT HERE")
             print("Seq num = " + str(seq_num) )
             print("self.seq_num = " + str(self.seq_num))
-            self.seq_num = self.seq_num +1
 
+            self.seq_num = seq_num + 1
             reset_packet = self.packet_format.pack(1, 8, 24, ack_num, seq_num, 0)
             rx_socket.sendto(reset_packet, ('localhost', tx_port))
-
             # send reset (RST) packet with sequence nubmer
 
-
           else:
-           
             print("sending ack for packet " + str(self.seq_num))
             self.current_buffer = data
             self.seq_num = seq_num + 1
             # send ack with ack = seq_num + 1, seq_num = ack + 1
             ack = self.packet_format.pack(1, 0, 24, ack_num + 1, seq_num, 0)
-            if (random.randint(1, 10) > 2):
+            if (random.randint(1, 10) > 8):
               print("dropping ack")
               rx_socket.sendto(ack, ('localhost', 1000))
             else:
