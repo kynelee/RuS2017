@@ -14,11 +14,7 @@ __device__ float warp_scan(const int lane, const int *rows, float *vals, float *
     vals[threadIdx.x] += vals[threadIdx.x - 8];
   if ( lane >= 16 && rows[threadIdx.x] == rows[threadIdx.x - 16] )
     vals[threadIdx.x] += vals[threadIdx.x - 16];
-/*  if ( lane == 31 || rows[threadIdx.x] != rows[threadIdx.x + 1] ){ //Must carry the value if last thread in the warp, or if you're the last thread for a row
-    atomicAdd(&y[rows[threadIdx.x]], vals[threadIdx.x]); 
-  } */
   return vals[threadIdx.x];
-  
 }
 
 __global__ void scan_matrix(const int nnz, const int* coord_row, const int* coord_col, const float* A, const float* x, float* y){
@@ -33,37 +29,44 @@ __global__ void scan_matrix(const int nnz, const int* coord_row, const int* coor
     int thread_id = blockDim.x * blockIdx.x + threadIdx.x;
     int thread_num = blockDim.x * gridDim.x;
     int iter = nnz % thread_num ? nnz/thread_num + 1: nnz/thread_num;
+    int entries_per_block = iter * blockDim.x;
 
 
     /* This is the code for the carry logic, if you don't want to atomically
      * write for every warp's execution */
-    int lane = threadIdx.x % 32;
-    int warp_id = threadIdx.x / 32;
+    int lane = threadIdx.x & 31; //powers of 2 are great
+    int warp_id = threadIdx.x >> 5;
+    int abs_warp_id = thread_id >> 5; 
+
     __shared__ float carry[32];
     __shared__ int carry_rows[32];
 
     if(lane == 0){
       carry[warp_id] = 0;
-      carry_rows[warp_id] = coord_row[iter*32*warp_id];
+      carry_rows[warp_id] = coord_row[thread_id];
     }
 
     for(int i = 0; i < iter; i++){
       int dataid = thread_id + i * thread_num;
+      //int dataid = lane + abs_warp_id * iter * 32 + 32*i;
+      //int dataid = threadIdx.x + blockIdx.x * entries_per_block + i * blockDim.x; 
       if(dataid < nnz){
         float data = A[dataid];
         int col = coord_col[dataid];
         int row = coord_row[dataid];
-
         rows[threadIdx.x] = row;
         vals[threadIdx.x] = data * x[col]; 
-
+         
         // Perform segment scan warp routine
         // The following commented code is an alternative version which carries the values 
         // by atomic add instead of utilizing shared memory.
-       
-        // if((lane!= 31 && row != rows[threadIdx.x + 1]) || lane == 31){ // end of row or last thread in warp, so carry results over
-        //  atomicAdd(&y[row], val);   
-        // }
+        
+        /*
+        float val= warp_scan(lane, rows, vals, y);
+        if((lane!= 31 && row != rows[threadIdx.x + 1]) || lane == 31){ // end of row or last thread in warp, so carry results over
+          atomicAdd(&y[row], val);   
+        }
+        */
 
         if(lane == 0){
           if(carry_rows[warp_id] != row){ //If you can't carry over, add it to the row
@@ -75,10 +78,12 @@ __global__ void scan_matrix(const int nnz, const int* coord_row, const int* coor
         } 
 
         float partial_sum = warp_scan(lane, rows, vals, y);
+
         if(lane != 31 && row != rows[threadIdx.x + 1]){ // end of row, and not the last thread in warp
                                                         // so add the values
             atomicAdd(&y[row], partial_sum);   
         }
+
         if(lane == 31){ // Set the new carry if you're the last thread in the warp
           carry[warp_id] = partial_sum;
           carry_rows[warp_id] = row;
@@ -89,46 +94,37 @@ __global__ void scan_matrix(const int nnz, const int* coord_row, const int* coor
     if(lane == 31){ //The last carries haven't been added yet, so add them 
       atomicAdd(&y[carry_rows[warp_id]], carry[warp_id]);
     }
+    
 }
+
 int cmpfunc (const void * a, const void * b)
 {
    return ( *(int*)a - *(int*)b );
 }
 
-void sort_matrix(MatrixInfo * mat, int * sorted_rows, float * sorted_vals, int * sorted_cols){
 
+void sort_matrix(MatrixInfo * mat, int * sorted_rows, float * sorted_vals, int * sorted_cols){ // sorts the matrix by row in O(n) where n 
+  // is the number of non zero entries
   memcpy(sorted_rows, mat->rIndex, mat->nz * sizeof(int));
-    
-
   qsort(sorted_rows, mat->nz, sizeof(int), cmpfunc);
-  
   int * row_start = (int *) calloc(mat->nz, sizeof(int));
-
   for(int i = 1; i < mat->nz; i++){
     if(sorted_rows[i] != sorted_rows[i - 1]){
       row_start[sorted_rows[i]] = i;
     }
   }
-  
   row_start[sorted_rows[0]] = 0;
-  
-  
-
   for(int i = 0; i < mat->nz; i++){
     int row = mat->rIndex[i];
-
     int insert_index = row_start[row];
-    
     sorted_vals[insert_index] = mat->val[i];
     sorted_cols[insert_index] = mat->cIndex[i];
     row_start[row] +=1;
   }
-
   mat->rIndex = sorted_rows;
   mat->cIndex = sorted_cols;
   mat->val = sorted_vals;
 }
-
 
 
 void getMulScan(MatrixInfo * mat, MatrixInfo * vec, MatrixInfo * res, int blockSize, int blockNum){
@@ -145,16 +141,7 @@ void getMulScan(MatrixInfo * mat, MatrixInfo * vec, MatrixInfo * res, int blockS
     float * sorted_vals= (float*) calloc(mat->nz, sizeof(float));
     int * sorted_cols= (int *)calloc(mat->nz, sizeof(int));
     
-    printf("Yes");
-
-
     sort_matrix(mat, sorted_rows, sorted_vals, sorted_cols);
-
-    for(int i = 0; i < mat->nz - 1; i ++){
-      if(mat->rIndex[i] >  mat->rIndex[i+1]){
-        printf("fuck");
-      }
-    }
 
     cudaMalloc((float**)&A, matrix_bytes);
     cudaMemset(A, 0, matrix_bytes);
@@ -187,7 +174,6 @@ void getMulScan(MatrixInfo * mat, MatrixInfo * vec, MatrixInfo * res, int blockS
     cudaMemcpy(res->val, y, vector_bytes, cudaMemcpyDeviceToHost);
     
     verify(mat, vec, res);
-
 
     cudaFree(A);
     cudaFree(x);

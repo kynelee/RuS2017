@@ -179,7 +179,7 @@ int main(int argc, char ** argv){
   } else {
     printf("Verifying...\n");
     int o = verify(matrix->nz, matrix->M, matrix->rIndex, matrix->cIndex, matrix->val, vector->val, product->val);
-   printf("%d Error rows \n", o);
+    printf("%d Error rows \n", o);
   }
 
 

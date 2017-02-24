@@ -24,7 +24,6 @@ void verify(MatrixInfo * mat, MatrixInfo * vec, MatrixInfo * result){
       error = product_val - result_val;
     }
   }
-
   printf("Biggest error found was %f\n", error);
 }
 
