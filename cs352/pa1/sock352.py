@@ -216,26 +216,37 @@ class socket:
 
             except syssock.timeout:
               continue
-
+          settimeout()
           
 
 
         else:
+
           seq_num = header[3]
           ack_num = header[4]
           payload = data 
           if (seq_num != self.seq_num) or payload_len != header[5]: # if ack is dropped or packet is malformed
-            reset_packet = self.packer_format.pack(1, 8, 24, ack_num, self.seq_num, 0)
-            rx_port.sendto(reset_packet, ('localhost', tx_port))
+            print("GOT HERE")
+            print("Seq num = " + str(seq_num) )
+            print("self.seq_num = " + str(self.seq_num))
+            self.seq_num = self.seq_num +1
 
+            reset_packet = self.packet_format.pack(1, 8, 24, ack_num, seq_num, 0)
+            rx_socket.sendto(reset_packet, ('localhost', tx_port))
 
             # send reset (RST) packet with sequence nubmer
 
 
           else:
+           
             print("sending ack for packet " + str(self.seq_num))
             self.current_buffer = data
             self.seq_num = seq_num + 1
             # send ack with ack = seq_num + 1, seq_num = ack + 1
             ack = self.packet_format.pack(1, 0, 24, ack_num + 1, seq_num, 0)
-            rx_socket.sendto(ack ,('localhost', tx_port))
+            if (random.randint(1, 10) > 2):
+              print("dropping ack")
+              rx_socket.sendto(ack, ('localhost', 1000))
+            else:
+              rx_socket.sendto(ack ,('localhost', tx_port))
+                
