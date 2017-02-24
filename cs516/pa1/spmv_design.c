@@ -13,26 +13,26 @@ __global__ void getMulDesign_kernel(const int nnz,
   int iter = nnz % thread_num ? nnz/thread_num + 1: nnz/thread_num;
   
   for (int i = 0; i < iter; i ++){
-    //int dataid = threadIdx.x + blockIdx.x * iter * blockDim.x + i * blockDim.x;
-    int dataid = (thread_id + thread_num*i);
+    int dataid = threadIdx.x + blockIdx.x * iter * blockDim.x + i * blockDim.x;
+    //int dataid = (thread_id + thread_num*i);
     if(dataid < nnz) {
       int row = coord_row[dataid];
       float data = A[dataid];
       float temp = data * x[dataid];
+
       atomicAdd(&y[row], temp);
     }
   }
 }
 
-
+    
 void get_MATT_vector(int nz, int * cols, float * vec, float * matt_vector){
   for(int i = 0; i < nz; i ++){
     matt_vector[i] =  vec[cols[i]];
   }
 }
 
-
-void reorder_matrix(MatrixInfo * mat, int * sorted_rows, int * sorted_cols, 
+int reorder_matrix(MatrixInfo * mat, int * sorted_rows, int * sorted_cols, 
     float * sorted_vals, int *ord_rows, int * ord_cols, float * ord_vals){ // sorts the matrix by row in O(n) where n 
   // is the number of non zero entries
   memcpy(sorted_rows, mat->rIndex, mat->nz * sizeof(int));
@@ -40,66 +40,49 @@ void reorder_matrix(MatrixInfo * mat, int * sorted_rows, int * sorted_cols,
   int * row_start = (int *) calloc(mat->M, sizeof(int));
   
   int unique_row_count = 0;
-
   for(int i = 1; i < mat->nz; i++){
     if(sorted_rows[i] != sorted_rows[i - 1]){
       unique_row_count +=1;
       row_start[sorted_rows[i]] = i;
     }
   }
-
-
   row_start[sorted_rows[0]] = 0;
-
   if(sorted_rows[0] != sorted_rows[1]){
     unique_row_count+=1;
   }
-
   for(int i = 0; i < mat->nz; i++){
     int row = mat->rIndex[i];
     int insert_index = row_start[row];
     sorted_vals[insert_index] = mat->val[i];
     sorted_cols[insert_index] = mat->cIndex[i];
-    sorted_rows[insert_index] = mat->rIndex[i];
     row_start[row] +=1;
-
-    /*
-    ord_rows[i] = row; 
-    ord_cols[i] = sorted_cols[insert_index];
-    ord_vals[i] = sorted_vals[insert_index]; 
-    */
-
   }
+
+  for(int i = 0; i < mat->nz; i++){
+    ord_rows[i] = sorted_rows[i];
+    ord_cols[i] = sorted_cols[i];
+    ord_vals[i] = sorted_vals[i];
+  }
+
+
   int unique_count = 1; 
   int not_unique_count = unique_row_count;
   
-  
-  for(int i = 0; i < mat->nz; i++){
-    /*
+  for(int i = 1; i < mat->nz; i++){
     int idx;
     if(sorted_rows[i] != sorted_rows[i-1]){
       idx = unique_count;
-      printf("unique%d\n", idx);
       unique_count +=1;
     }
     else{
       idx = not_unique_count; 
-      printf("notunique%d\n", idx);
       not_unique_count = not_unique_count+1;
     }
-    */
-    /*
     ord_rows[idx] = sorted_rows[i]; 
     ord_cols[idx] = sorted_cols[i];
     ord_vals[idx] = sorted_vals[i]; 
-    */
-    ord_rows[i] = sorted_rows[i]; 
-    ord_cols[i] = sorted_cols[i];
-    ord_vals[i] = sorted_vals[i]; 
   }
-
-  
-  
+  return unique_row_count;
 }
 
 void getMulDesign(MatrixInfo * mat, MatrixInfo * vec, MatrixInfo * res, int blockSize, int blockNum){
@@ -125,27 +108,24 @@ void getMulDesign(MatrixInfo * mat, MatrixInfo * vec, MatrixInfo * res, int bloc
     float * ord_vals = (float*) calloc(mat->nz, sizeof(float));
     int * ord_cols = (int *)calloc(mat->nz, sizeof(int));
 
+    
 
     reorder_matrix(mat, sorted_rows, sorted_cols, sorted_vals, ord_rows, ord_cols, ord_vals);
     get_MATT_vector(mat->nz, ord_cols, vec->val,  matt_vector); //change to ord_cols and ord_vals once done
 
-    printf("m row %d\n", ord_rows[2000]);
-    printf("m col %d\n", ord_cols[2000]);
-    printf("m val %f\n", ord_vals[2000]);
-    
-
-    printf("m row %d\n", ord_rows[3001]);
-    printf("m col %d\n", ord_cols[3001]);
-    printf("m val %f\n", ord_vals[3001]);
-    
    
     cudaMalloc((float**)&A, matrix_bytes);
     cudaMemset(A, 0, matrix_bytes);
-    cudaMemcpy(A, mat->val, matrix_bytes, cudaMemcpyHostToDevice);
+    cudaMemcpy(A, ord_vals, matrix_bytes, cudaMemcpyHostToDevice);
+
+    cudaMalloc((int**)&coord_row, matrix_bytes);
+    cudaMemset(coord_row, 0, matrix_bytes);
+    cudaMemcpy(coord_row, ord_rows, matrix_bytes, cudaMemcpyHostToDevice);
 
     cudaMalloc((float**)&x, matrix_bytes);
     cudaMemset(x, 0, matrix_bytes);
     cudaMemcpy(x, matt_vector, matrix_bytes, cudaMemcpyHostToDevice);
+
 
     /*
     cudaMalloc((float**)&x, matrix_bytes);
@@ -174,9 +154,6 @@ void getMulDesign(MatrixInfo * mat, MatrixInfo * vec, MatrixInfo * res, int bloc
     cudaMemset(y, 0, vector_bytes);
     
 
-    cudaMalloc((int**)&coord_row, matrix_bytes);
-    cudaMemset(coord_row, 0, matrix_bytes);
-    cudaMemcpy(coord_row, mat->rIndex, matrix_bytes, cudaMemcpyHostToDevice);
     
     struct timespec start, end;
     clock_gettime(CLOCK_MONOTONIC_RAW, &start);
