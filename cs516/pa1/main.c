@@ -83,8 +83,8 @@ int verify(const int nz, const int M, const int *rIndex, const int *cIndex, cons
     float rel = k / l;
     if (rel > .01) {
       o++;
-      printf("Yours - %f, correct - %f, Relative error - %f\n", res[i], correct[i], rel);
-      printf("Row index is: %d\n", rIndex[i]);
+      //printf("Yours - %f, correct - %f, Relative error - %f\n", res[i], correct[i], rel);
+      //printf("Row index is: %d\n", rIndex[i]);
     }
   }
 

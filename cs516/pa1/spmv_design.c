@@ -48,6 +48,7 @@ void reorder_matrix(MatrixInfo * mat, int * sorted_rows, int * sorted_cols,
     }
   }
 
+
   row_start[sorted_rows[0]] = 0;
 
   if(sorted_rows[0] != sorted_rows[1]){
@@ -62,12 +63,24 @@ void reorder_matrix(MatrixInfo * mat, int * sorted_rows, int * sorted_cols,
     if(sorted_rows[insert_index] != row){
       printf("error");
     }
+    if(row_start[row] > mat->nz){
+      printf("error");
+    }
     row_start[row] +=1;
 
-    ord_rows[i] = sorted_rows[i]; 
-    ord_cols[i] = sorted_cols[i];
-    ord_vals[i] = sorted_vals[i]; 
+    /*
+    ord_rows[i] = row; 
+    ord_cols[i] = sorted_cols[insert_index];
+    ord_vals[i] = sorted_vals[insert_index]; */
+
+    ord_rows[i] = mat->rIndex[i]; 
+    ord_cols[i] = mat->cIndex[i];
+    ord_vals[i] = mat->val[i]; 
   }
+
+  printf("row j%d\n", ord_rows[2000]);
+  printf("col %d\n", ord_cols[2000]);
+  printf("val %f\n", ord_vals[2000]);
 
   /*
   int unique_count = 0; 
@@ -116,7 +129,6 @@ void getMulDesign(MatrixInfo * mat, MatrixInfo * vec, MatrixInfo * res, int bloc
     float * x;
     float * y;
 
-//    float * matt_matrix = (float *) calloc(mat->nz * 3, sizeof(float));
     float * matt_vector = (float *) calloc(mat->nz, sizeof(float));
 
     int * sorted_rows = (int *) calloc(mat->nz, sizeof(int));
@@ -127,11 +139,14 @@ void getMulDesign(MatrixInfo * mat, MatrixInfo * vec, MatrixInfo * res, int bloc
     float * ord_vals = (float*) calloc(mat->nz, sizeof(float));
     int * ord_cols = (int *)calloc(mat->nz, sizeof(int));
 
-//    reorder_matrix(mat, sorted_rows, sorted_cols, sorted_vals, ord_rows, ord_cols, ord_vals);
-    get_MATT_vector(mat->nz, mat->cIndex, vec->val,  matt_vector); //change to ord_cols and ord_vals once done
+
+    reorder_matrix(mat, sorted_rows, sorted_cols, sorted_vals, ord_rows, ord_cols, ord_vals);
+    get_MATT_vector(mat->nz, ord_cols, vec->val,  matt_vector); //change to ord_cols and ord_vals once done
+
+    printf("m row %d\n", ord_rows[2000]);
+    printf("m col %d\n", ord_cols[2000]);
+    printf("m val %f\n", ord_vals[2000]);
     
-
-
    
     cudaMalloc((float**)&A, matrix_bytes);
     cudaMemset(A, 0, matrix_bytes);
@@ -140,6 +155,7 @@ void getMulDesign(MatrixInfo * mat, MatrixInfo * vec, MatrixInfo * res, int bloc
     cudaMalloc((float**)&x, matrix_bytes);
     cudaMemset(x, 0, matrix_bytes);
     cudaMemcpy(x, matt_vector, matrix_bytes, cudaMemcpyHostToDevice);
+
     /*
     cudaMalloc((float**)&x, matrix_bytes);
     cudaMemset(x, 0, matrix_bytes);
