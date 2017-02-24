@@ -60,59 +60,45 @@ void reorder_matrix(MatrixInfo * mat, int * sorted_rows, int * sorted_cols,
     int insert_index = row_start[row];
     sorted_vals[insert_index] = mat->val[i];
     sorted_cols[insert_index] = mat->cIndex[i];
-    if(sorted_rows[insert_index] != row){
-      printf("error");
-    }
-    if(row_start[row] > mat->nz){
-      printf("error");
-    }
+    sorted_rows[insert_index] = mat->rIndex[i];
     row_start[row] +=1;
 
     /*
     ord_rows[i] = row; 
     ord_cols[i] = sorted_cols[insert_index];
-    ord_vals[i] = sorted_vals[insert_index]; */
+    ord_vals[i] = sorted_vals[insert_index]; 
+    */
 
-    ord_rows[i] = mat->rIndex[i]; 
-    ord_cols[i] = mat->cIndex[i];
-    ord_vals[i] = mat->val[i]; 
   }
-
-  printf("row j%d\n", ord_rows[2000]);
-  printf("col %d\n", ord_cols[2000]);
-  printf("val %f\n", ord_vals[2000]);
-
-  /*
-  int unique_count = 0; 
-  int not_unique = 0;
-  int last_row_added = -1;
+  int unique_count = 1; 
+  int not_unique_count = unique_row_count;
   
-  for(int i = 0; i < mat->nz; i ++){
+  
+  for(int i = 0; i < mat->nz; i++){
+    /*
     int idx;
-    if(sorted_rows[i] != last_row_added){
+    if(sorted_rows[i] != sorted_rows[i-1]){
       idx = unique_count;
-      unique_count = unique_count + 1;
+      printf("unique%d\n", idx);
+      unique_count +=1;
     }
     else{
-      idx = not_unique + unique_row_count; 
-      not_unique +=1;
+      idx = not_unique_count; 
+      printf("notunique%d\n", idx);
+      not_unique_count = not_unique_count+1;
     }
+    */
+    /*
     ord_rows[idx] = sorted_rows[i]; 
     ord_cols[idx] = sorted_cols[i];
     ord_vals[idx] = sorted_vals[i]; 
-    last_row_added = sorted_rows[i];
+    */
+    ord_rows[i] = sorted_rows[i]; 
+    ord_cols[i] = sorted_cols[i];
+    ord_vals[i] = sorted_vals[i]; 
   }
-  */
-  /*
-  for(int i = 0; i < mat->nz; i++){
-      printf("row j%d\n", ord_rows[i]);
-      printf("col %d\n", ord_cols[i]);
-      printf("val %f\n", ord_vals[i]);
-      printf("soiasdjfoairow j%d\n", sorted_rows[i]);
-      printf("col %d\n", sorted_cols[i]);
-      printf("val %f\n", sorted_vals[i]);
-  }
-  */
+
+  
   
 }
 
@@ -146,6 +132,11 @@ void getMulDesign(MatrixInfo * mat, MatrixInfo * vec, MatrixInfo * res, int bloc
     printf("m row %d\n", ord_rows[2000]);
     printf("m col %d\n", ord_cols[2000]);
     printf("m val %f\n", ord_vals[2000]);
+    
+
+    printf("m row %d\n", ord_rows[3001]);
+    printf("m col %d\n", ord_cols[3001]);
+    printf("m val %f\n", ord_vals[3001]);
     
    
     cudaMalloc((float**)&A, matrix_bytes);
