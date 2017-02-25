@@ -8,6 +8,7 @@ import sys
 import time
 import random
 
+
 # this init function is global clto the class and
 # defines the UDP ports all messages are sent
 # and received from.
@@ -21,6 +22,7 @@ def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
     rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
     rx_socket.bind(('', rx_port))
     tx_port = int(UDPportTx)
+
     
 class socket:
     
@@ -31,7 +33,9 @@ class socket:
         self.current_buffer = None
         self.client_closed = False
         self.packet_format = struct.Struct('!BBHQQL')
-
+        self.address = None 
+        self.client = False
+        self.server = False
 
     def bind(self,address):
       # null function for part 1 
@@ -39,6 +43,8 @@ class socket:
 
     def connect(self,address):  # fill in your code here
         global tx_port
+        self.address = address[0] 
+        self.client = True
 
         init_sequence_no = random.randint(1,100) 
         init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
@@ -46,7 +52,7 @@ class socket:
         while True:
           try:
             rx_socket.settimeout(.2)
-            rx_socket.sendto(init_packet, ('localhost', tx_port))
+            rx_socket.sendto(init_packet, (self.address, tx_port))
 
             print("Sending init packet with sequence number + " + str(init_sequence_no))
             print(tx_port)
@@ -57,7 +63,7 @@ class socket:
             print("Received ack packet " + str(ack))
 
             client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
-            rx_socket.sendto(client_ack, ('localhost', tx_port))
+            rx_socket.sendto(client_ack, (self.address, tx_port))
 
             print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
 
@@ -86,24 +92,31 @@ class socket:
     def close(self):   # fill in your code here
         # send a FIN packet (flags with FIN bit set)
         # remove the connection from the list of connections
-        
-        while True:
-          try:
-            rx_socket.settimeout(.2)
-            final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
-            rx_socket.sendto(final_packet, ('localhost', tx_port))
 
-            final_ack = rx_socket.recv(1096)
-            final_ack = self.packet_format.unpack(final_ack)
-            
-            
-            if final_ack[1] == 2:
-              print("Terminating connection")
-              rx_socket.close()
-              return
 
-          except syssock.timeout:
-            continue
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+                print("Terminating connection")
+                rx_socket.close()
+                return
+
+            except syssock.timeout:
+              continue
 
 
 
@@ -118,7 +131,7 @@ class socket:
         while True:
           try:
             print("sending packet number " + str(self.seq_num))
-            rx_socket.sendto(packet, ('localhost', tx_port))
+            rx_socket.sendto(packet, (self.address, tx_port))
             rx_socket.settimeout(.2)
 
             ack = rx_socket.recv(1096)
@@ -171,10 +184,10 @@ class socket:
     def  __sock352_get_packet(self):
         global tx_port
       
-        packet = rx_socket.recv(64000)
+        packet, address = rx_socket.recvfrom(64000)
         header = self.packet_format.unpack(packet[:24])
         data = packet[24: len(packet)]
-
+        self.address = address[0]
         payload_len = len(data) 
         
 
@@ -190,7 +203,7 @@ class socket:
           while True:
             try:
               rx_socket.settimeout(.2)
-              rx_socket.sendto(ack, ('localhost', tx_port))
+              rx_socket.sendto(ack, address)
 
               print("sending server ack" + str(self.packet_format.unpack(ack)))
 
@@ -218,10 +231,13 @@ class socket:
           while True:
             try:
               rx_socket.settimeout(.2)
-              self.client_closed = True
               final_ack = self.packet_format.pack(1, 2, 0, 0, 0, 0)
-              rx_socket.sendto(final_ack, ('localhost', tx_port))
+              rx_socket.sendto(final_ack, address)
+              self.client_closed = True
               break
+
+            except syssock.error:
+              self.client_closed = True
 
             except syssock.timeout:
               continue
@@ -237,7 +253,7 @@ class socket:
 
             self.seq_num = seq_num + 1
             reset_packet = self.packet_format.pack(1, 8, 24, ack_num, seq_num, 0)
-            rx_socket.sendto(reset_packet, ('localhost', tx_port))
+            rx_socket.sendto(reset_packet, address)
             # send reset (RST) packet with sequence nubmer
 
           else:
@@ -248,7 +264,7 @@ class socket:
             ack = self.packet_format.pack(1, 0, 24, ack_num + 1, seq_num, 0)
             if (random.randint(1, 10) > 8):
               print("dropping ack")
-              rx_socket.sendto(ack, ('localhost', 1000))
+              
             else:
-              rx_socket.sendto(ack ,('localhost', tx_port))
+              rx_socket.sendto(ack , address)
                 
