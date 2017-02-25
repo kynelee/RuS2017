@@ -127,29 +127,6 @@ void getMulDesign(MatrixInfo * mat, MatrixInfo * vec, MatrixInfo * res, int bloc
     cudaMemcpy(x, matt_vector, matrix_bytes, cudaMemcpyHostToDevice);
 
 
-    /*
-    cudaMalloc((float**)&x, matrix_bytes);
-    cudaMemset(x, 0, matrix_bytes);
-    cudaMemcpy(x, matt_vector, matrix_bytes, cudaMemcpyHostToDevice);
-    */
-
-    /*
-    cudaMalloc((float**)&A, matrix_bytes);
-    cudaMemset(A, 0, matrix_bytes);
-    cudaMemcpy(A, ord_vals, matrix_bytes, cudaMemcpyHostToDevice);
-    */
-
-    
-    
-    
-
-    /* 
-    cudaMalloc((float**)&x, vector_bytes);
-    cudaMemset(x, 0, vector_bytes);
-    cudaMemcpy(x, vec->val, vector_bytes, cudaMemcpyHostToDevice);
-    */
-    
-
     cudaMalloc((float**)&y, vector_bytes);
     cudaMemset(y, 0, vector_bytes);
     
@@ -164,7 +141,7 @@ void getMulDesign(MatrixInfo * mat, MatrixInfo * vec, MatrixInfo * res, int bloc
 
     cudaDeviceSynchronize();
     clock_gettime(CLOCK_MONOTONIC_RAW, &end);
-    printf("Atomic Kernel Time: %lu micro-seconds\n", 1000000 * (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1000);
+    printf("Design Kernel Time: %lu milli-seconds\n", 1000000 * (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1000);
 
     cudaMemcpy(res->val, y, vector_bytes, cudaMemcpyDeviceToHost);
 
