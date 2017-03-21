@@ -123,7 +123,7 @@ static int expr()
 		reg = next_register();
 		CodeGen(ADD, left_reg, right_reg, reg);
 		return reg;
-    case '%":
+    case '%':
 		next_token();
 		left_reg = expr();
 		right_reg = expr();
@@ -137,7 +137,7 @@ static int expr()
         reg = next_register();
         CodeGen(SUB, reg, left_reg, right_reg);
         return reg;
-    case '*';
+    case '*':
         next_token();
         left_reg = expr();
         right_reg = expr();
@@ -163,13 +163,13 @@ static int expr()
 	case '1':
 	case '2':
 	case '3':
-	case '3':
 	case '4':
 	case '5':
 	case '6':
 	case '7':
 	case '8':
 	case '9':
+    case '0':
         return digit();
 
 	default:
@@ -189,51 +189,133 @@ static void assign()
   }
 
   var = variable();
-  next_token();
-  
-  if(token == '='){ next_token;}
-  else {
+
+  if(token != '='){
     ERROR("Program error.  Current input symbol is %c\n", token);
     exit(EXIT_FAILURE);
   }
 
+  next_token();
   reg = expr();
   CodeGen(STOREAI, var, reg, EMPTY_FIELD);
 }
 
 static void print()
 {
-	/* YOUR CODE GOES HERE */
+  char var;
+  if(token != '#'){
+      ERROR("Invalid program error. Current token was %c.\n", token);
+      exit(EXIT_FAILURE);
+  }
+
+  next_token();
+
+  if(!is_identifier(token)){
+      ERROR("Invalid program error. Current token was %c.\n", token);
+      exit(EXIT_FAILURE);
+  }
+
+  var = token;
+  next_token();
+  CodeGen(OUTPUTAI, var, EMPTY_FIELD, EMPTY_FIELD);
 }
 
 static void stmt()
 {
-	/* YOUR CODE GOES HERE */
+  switch(token) {
+    case 'a':
+    case 'b':
+    case 'c':
+    case 'd':
+    case 'e':
+    case 'f':
+    case 'h':
+    case 'i':
+    case 'j':
+    case 'k':
+    case 'l':
+    case 'm':
+    case 'n':
+    case 'o':
+    case 'p':
+        assign();
+        break;
+    case '#':
+        print();
+        break;
+    default:
+        ERROR("Program error.  Current input symbol is %c\n", token);
+	    exit(EXIT_FAILURE);
+  }
 }
 
 static void morestmts()
 {
-	/* YOUR CODE GOES HERE */
+  if(token != ';'){
+    return;
+  }
+  next_token();
+  stmtlist();
 }
 
 static void stmtlist()
 {
-	/* YOUR CODE GOES HERE */
+  switch(token){
+    case 'a':
+    case 'b':
+    case 'c':
+    case 'd':
+    case 'e':
+    case 'f':
+    case 'h':
+    case 'i':
+    case 'j':
+    case 'k':
+    case 'l':
+    case 'm':
+    case 'n':
+    case 'o':
+    case 'p':
+    case '#':
+        stmt();
+        morestmts();
+        break;
+    default:
+      ERROR("Program error.  Current input symbol is %c\n", token);
+      exit(EXIT_FAILURE);
+  }
 }
 
 static void program()
 {
-	/* YOUR CODE GOES HERE */
+    switch(token){
+      case 'a':
+      case 'b':
+      case 'c':
+      case 'd':
+      case 'e':
+      case 'f':
+      case 'h':
+      case 'i':
+      case 'j':
+      case 'k':
+      case 'l':
+      case 'm':
+      case 'n':
+      case 'o':
+      case 'p':
+      case '#':
+          stmtlist();
+          if(token != '.') {
+            ERROR("Program error.  Current input symbol is %c\n", token);
+            exit(EXIT_FAILURE);
+          }
+          break;
+      default:
+        ERROR("Program error.  Current input symbol is %c\n", token);
+        exit(EXIT_FAILURE);
 
-        /* THIS CODE IS BOGUS */
-        int dummy;
-        /* THIS CODE IS BOGUS */
-	dummy = expr();
-
-	if (token != '.') {
-	  ERROR("Program error.  Current input symbol is %c\n", token);
-	  exit(EXIT_FAILURE);
-	};
+    }
 }
 
 /*************************************************************************/
