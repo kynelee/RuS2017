@@ -123,20 +123,54 @@ static int expr()
 		reg = next_register();
 		CodeGen(ADD, left_reg, right_reg, reg);
 		return reg;
-
-
-        case 'f':
-                return variable();
-
-
+    case '%":
+		next_token();
+		left_reg = expr();
+		right_reg = expr();
+		reg = next_register();
+		CodeGen(DIV, left_reg, right_reg, reg);
+		return reg;
+    case '-':
+        next_token();
+        left_reg = expr();
+        right_reg = expr();
+        reg = next_register();
+        CodeGen(SUB, reg, left_reg, right_reg);
+        return reg;
+    case '*';
+        next_token();
+        left_reg = expr();
+        right_reg = expr();
+        reg = next_register();
+        CodeGen(SUB, reg, left_reg, right_reg);
+        return reg;
+    case 'a':
+    case 'b':
+    case 'c':
+    case 'd':
+    case 'e':
+    case 'f':
+    case 'h':
+    case 'i':
+    case 'j':
+    case 'k':
+    case 'l':
+    case 'm':
+    case 'n':
+    case 'o':
+    case 'p':
+        return variable();
 	case '1':
-                return digit();
-
 	case '2':
-                return digit();
-
 	case '3':
-                return digit();
+	case '3':
+	case '4':
+	case '5':
+	case '6':
+	case '7':
+	case '8':
+	case '9':
+        return digit();
 
 	default:
 		ERROR("Symbol %c unknown\n", token);
@@ -146,7 +180,25 @@ static int expr()
 
 static void assign()
 {
-	/* YOUR CODE GOES HERE */
+  int reg;
+  char var;
+
+  if(!is_identifier(token)){
+    ERROR("Expected Identifier\n");
+    exit(EXIT_FAILURE);
+  }
+
+  var = variable();
+  next_token();
+  
+  if(token == '='){ next_token;}
+  else {
+    ERROR("Program error.  Current input symbol is %c\n", token);
+    exit(EXIT_FAILURE);
+  }
+
+  reg = expr();
+  CodeGen(STOREAI, var, reg, EMPTY_FIELD);
 }
 
 static void print()
