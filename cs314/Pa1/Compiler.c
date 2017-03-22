@@ -135,14 +135,14 @@ static int expr()
         left_reg = expr();
         right_reg = expr();
         reg = next_register();
-        CodeGen(SUB, reg, left_reg, right_reg);
+        CodeGen(SUB, left_reg, right_reg, reg);
         return reg;
     case '*':
         next_token();
         left_reg = expr();
         right_reg = expr();
         reg = next_register();
-        CodeGen(SUB, reg, left_reg, right_reg);
+        CodeGen(MUL, left_reg, right_reg, reg);
         return reg;
     case 'a':
     case 'b':
@@ -181,23 +181,24 @@ static int expr()
 static void assign()
 {
   int reg;
-  char var;
+  int offset;
 
   if(!is_identifier(token)){
     ERROR("Expected Identifier\n");
     exit(EXIT_FAILURE);
   }
 
-  var = variable();
-
+  offset = (token -'a') *4;
+  next_token();
   if(token != '='){
     ERROR("Program error.  Current input symbol is %c\n", token);
     exit(EXIT_FAILURE);
   }
-
-  next_token();
+  else{
+    next_token();
+  }
   reg = expr();
-  CodeGen(STOREAI, var, reg, EMPTY_FIELD);
+  CodeGen(STOREAI, reg, 0, offset);
 }
 
 static void print()
@@ -215,9 +216,9 @@ static void print()
       exit(EXIT_FAILURE);
   }
 
-  var = token;
+  int offset = (token-'a')*4;
   next_token();
-  CodeGen(OUTPUTAI, var, EMPTY_FIELD, EMPTY_FIELD);
+  CodeGen(OUTPUTAI, 0, offset, EMPTY_FIELD);
 }
 
 static void stmt()
@@ -415,7 +416,7 @@ static char *read_input(FILE * f)
 
 int main(int argc, char *argv[])
 {
-	const char *outfilename = "tinyL.out";
+	const char *outfilename = "my.out";
 	char *input;
 	FILE *infile;
 
