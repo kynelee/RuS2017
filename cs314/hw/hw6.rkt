@@ -94,7 +94,6 @@
   )
 )
 
-(delete 'c '(a ((b) (c d) (((e))))))
 
 (test-case "p2.4 (1)"
            (delete 'c '(a ((b) (c d) (((e))))))
@@ -108,18 +107,36 @@
 
 (define NewTable
   (lambda ()
-    'YOUR-CODE-HERE))
+    '()
+  )
+)
 
 (define InsertIntoTable
   (lambda (entry table)
-    'YOUR-CODE-HERE))
-
+    (define key (car entry))
+    (cond ((null? table) (list entry))
+          ((equal? (car (car table)) key) (cons
+                                             (entry)
+                                             (cdr table)))
+          (else (cons
+                  (car table)
+                  (InsertIntoTable entry (cdr table))))
+    )
+  )
+)
+      
 (define LookupTable
   (lambda (variable table)
-    'YOUR-CODE-HERE))
+    (cond ((null? table) '())
+          ((equal? variable (car (car table))) (car (cdr (car table))))
+          (else (LookupTable variable (cdr table)))
+    ) 
+  )
+)
 
 (define table
   (InsertIntoTable '(b (2 4 5)) (InsertIntoTable '(a 7) (NewTable))))
+
 
 (test-case "p3 (1)" (LookupTable 'a table) 7)
 (test-case "p3 (2)" (LookupTable 'b table) '(2 4 5))
@@ -141,14 +158,44 @@
         id
         (op (car l) (reduce op (cdr l) id)))))
 
+
+(define square
+  (lambda (x) 
+    (* x x)))
+
+
+
 (define minSquareVal
   (lambda (l)
-    'YOUR-CODE-HERE))
+    (reduce (lambda(x y) 
+              (cond
+                ((and (null? x) (null? y)) '())
+                ((null? x) y)
+                ((null? y) x)
+                ((< x y) x)
+                (else y)
+              )
+            )
+            (map square l)
+            '())
+  )
+)
 
 (define maxSquareVal
   (lambda (l)
-    'YOUR-CODE-HERE))
+    (reduce (lambda(x y) 
+              (cond
+                ((and (null? x) (null? y)) '())
+                ((null? x) y)
+                ((null? y) x)
+                ((> x y) x)
+                (else y)
+              )
+            )
+            (map square l)
+            '())
+  )
+)
 
 (test-case "p4 (1)" (minSquareVal '(-5 3 -7 10 -11 8 7)) 9)
-
 (test-case "p4 (2)" (maxSquareVal '(-5 3 -7 10 -11 8 7)) 121)
