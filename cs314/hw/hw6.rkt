@@ -164,7 +164,6 @@
     (* x x)))
 
 
-
 (define minSquareVal
   (lambda (l)
     (reduce (lambda(x y) 
