@@ -20,7 +20,7 @@
 ; Problem 1.2: '(* a 4) such that ((car '(* a 4)) 5 3) equals 15
 
 (define p12list
-  (cons * '(5 3)))
+  (cons * '(a 4)))
 
 (test-case "p1.2" ((car p12list) 5 3) 15)
 
