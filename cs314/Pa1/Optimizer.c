@@ -38,6 +38,7 @@ int main()
       if(!(curr->critical == '1')){
         curr->next->prev = curr->prev;
         curr->prev->next = curr->next;
+        free(curr);
       }
       curr = next;
     }
@@ -49,13 +50,11 @@ int main()
 }
 
 void findUsed(Instruction * curr){
-  int found_instr = 0;
-  while(curr && !found_instr){
+  while(curr){
     switch(curr->opcode)
       {
         case OUTPUTAI: 
           curr->critical = '1';
-          // Instruction *prev = curr;
           int reg = curr->field1;
           int loc = curr->field2;
           markLoad(curr, reg);
@@ -69,8 +68,7 @@ void findUsed(Instruction * curr){
 }
 
 void markStore(Instruction * curr, int reg, int loc){
-  int found_instr = 0;
-  while(!found_instr && curr){
+  while(curr){
     switch(curr->opcode){
       case STOREAI:
         if(curr->field2 == reg && curr->field3==loc && !(curr->critical == '1')){
@@ -87,8 +85,7 @@ void markStore(Instruction * curr, int reg, int loc){
 }
 
 void markLoad(Instruction * curr, int reg){
-  int found_instr = 0;
-  while(!found_instr && curr){
+  while(curr){
     switch(curr->opcode){
       case LOADI:
         if(curr->field2 == reg && !(curr->critical == '1')){
@@ -103,8 +100,7 @@ void markLoad(Instruction * curr, int reg){
 }
 
 void markArithmetic(Instruction * curr, int reg){
-  int found_instr = 0;
-  while(!found_instr && curr){
+  while(curr){
     switch(curr->opcode){
       case LOADI:
         if(curr->field2 == reg){
@@ -132,6 +128,5 @@ void markArithmetic(Instruction * curr, int reg){
     }
     curr = curr->prev;
   }
-
 }
 

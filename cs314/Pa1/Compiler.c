@@ -203,7 +203,6 @@ static void assign()
 
 static void print()
 {
-  char var;
   if(token != '#'){
       ERROR("Invalid program error. Current token was %c.\n", token);
       exit(EXIT_FAILURE);
@@ -416,7 +415,7 @@ static char *read_input(FILE * f)
 
 int main(int argc, char *argv[])
 {
-	const char *outfilename = "my.out";
+	const char *outfilename = "tinyL.out";
 	char *input;
 	FILE *infile;
 
