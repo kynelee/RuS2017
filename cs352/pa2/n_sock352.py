@@ -202,6 +202,7 @@ class socket:
           return data
     
     #__sock352_get_packet creates and sends acks to the client when packets are recieved. It makes sure to check that the seq_num is in the correct order as well as check the flags of the packet sent            
+
     def  __sock352_get_packet(self):
         global tx_port 
         packet, address = rx_socket.recvfrom(64000)
@@ -213,8 +214,17 @@ class socket:
 
         if flags == 1: # initial handshake 
           print("Received connection initiation " + str(packet))
+          self.nonce = nacl.utils.random(Box.NONCE_SIZE)
           server_seq_num = random.randint(1,100)
-          ack = self.packet_format.pack(1, 0, 0, 0, 40, 0, 0, 0, server_seq_num, header[8] + 1, 0, 0) # send back Ack with bits set to indicate handshake is completed
+          ack = self.packet_format.pack(1, 0, 0, 0, 40, 0, 0, 0, server_seq_num, header[8] + 1, 0, self.nonce) # send back Ack with bits set to indicate handshake is completed
+          encrypt_key = privateKeys(('localhost', rx_port))
+          decrypt_key = publicKeys(address)
+          print("encrypt_key: {}".format(str(encrypt_key)))
+          print("decrypt_key: {}".format(str(decrypt_key)))
+          print("nonce: {}".format(str(self.nonce)))
+
+          self.encrypt_box = Box(encrypt_key, decrypt_key)
+          self.decrypt_box = Box(decrypt_key, encrypt_key)
 
           while True:
             try:
@@ -267,4 +277,3 @@ class socket:
             self.seq_num = seq_num + 1
             ack = self.packet_format.pack(1, 0, 0, 0, 40, 0, 0, 0, ack_num + 1, seq_num, 0, 0)
             rx_socket.sendto(ack , address)
-                
