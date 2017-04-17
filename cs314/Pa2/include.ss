@@ -1,4 +1,3 @@
-
 ; *********************************************
 ; *  314 Principles of Programming Languages  *
 ; *  Fall 2017                                *

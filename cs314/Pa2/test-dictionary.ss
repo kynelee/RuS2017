@@ -12,4 +12,3 @@
 (define dictionary '( (h e l l o)
                       (m a y)
                       (t r e e f r o g) ))
-
