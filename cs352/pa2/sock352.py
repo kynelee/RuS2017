@@ -73,9 +73,7 @@ def readKeyChain(filename):
             print ("error: No filename presented")             
 
 
-    print publicKeys
-    print privateKeys
-
+    print("Read in Key file")
     return (publicKeys,privateKeys)
 
 
@@ -130,12 +128,14 @@ class socket:
 
         init_sequence_no = random.randint(1,100) # randomly select first seq num
    #                                            opt,prot,h-len,c-sum,s-port,d-port,     ack,rec-window, payload len                           
-        init_packet = self.packet_format.pack(1, 1, 0, 0, 40, 0, 0, 0, init_sequence_no, 0, 0, 0)
 
         if (len(args) < 2):
           
           while True:
+
             try:
+
+              init_packet = self.packet_format.pack(1, 1, 0, 0, 40, 0, 0, 0, init_sequence_no, 0, 0, 0)
               rx_socket.settimeout(.2)
               rx_socket.sendto(init_packet, (self.address, tx_port)) 
 
@@ -164,7 +164,8 @@ class socket:
 
 
         elif (len(args) >=2):  
-          if (args[0] == ENCRYPT):
+          if (args[1] == ENCRYPT):
+            print("USING ENCRYPTION")
             self.encrypt = True
 
         
@@ -174,7 +175,6 @@ class socket:
             encrypt_key = privateKeys[('*', '*')]
 
           try:
-            print(address)
             decrypt_key = publicKeys[address]
           except:
             decrypt_key = publicKeys[('*', '*')]
@@ -184,6 +184,8 @@ class socket:
 
           while True:
             try:
+
+              init_packet = self.packet_format.pack(1, 1, 1, 0, 40, 0, 0, 0, init_sequence_no, 0, 0, 0)
               rx_socket.settimeout(.2)
               rx_socket.sendto(init_packet, (self.address, tx_port)) 
 
@@ -193,7 +195,6 @@ class socket:
               header = self.packet_format.unpack(ack[:40]) 
               nonce = ack[40: len(ack)]
               self.nonce = nonce
-
               print("Received ack packet " + str(ack))
 
               client_ack = self.packet_format.pack(1, 0, 0, 0, 40, 0, 0, 0, int(header[9]), int(header[8]) + 1, 0, 0) # Send final client ack
@@ -257,13 +258,20 @@ class socket:
     #send creates and sends packets as well as checks the acks revcieved 
     def send(self, buffer):
         bytessent = 0     # fill in your code here
+
+        ret_length = len(buffer)
+
+        if(self.encrypt):
+          print("Encrypting packet " + str(self.seq_num))
+          buffer = self.box.encrypt(buffer, self.nonce)
+        
         payload_len = len(buffer) 
         packet = self.packet_format.pack(1, 0, 0, 0, 40, 0, 0, 0, self.seq_num, self.ack_num, 0, payload_len)
-        packet = packet + buffer
+        packet = packet + buffer 
         
         while True:
           try:
-            print("sending packet number " + str(self.seq_num))
+            print("Sending packet number " + str(self.seq_num))
             rx_socket.sendto(packet, (self.address, tx_port))
             rx_socket.settimeout(.2)
             ack = rx_socket.recv(1096)
@@ -278,7 +286,7 @@ class socket:
           except syssock.timeout:
             continue
 
-        return payload_len
+        return ret_length
 
     #recv recieves the data and makes sure it is delivered in the correct fragment size by utilizing a buffer 
     def recv(self,bytes_to_receive): 
@@ -296,7 +304,6 @@ class socket:
           
           while not self.current_buffer and self.client_closed == False:
             try:
-              print("executing")
               rx_socket.settimeout(.2)
               self.__sock352_get_packet() # Get another packet
             except syssock.timeout:
@@ -324,8 +331,6 @@ class socket:
           print("Received connection initiation " + str(packet))
           self.nonce = nacl.utils.random(Box.NONCE_SIZE)
           server_seq_num = random.randint(1,100)
-          print(type(self.nonce))
-          print(self.nonce)
           ack = self.packet_format.pack(1, 0, 0, 0, 40, 0, 0, 0, server_seq_num, header[8] + 1, 0, len(self.nonce)) # send back Ack with bits set to indicate handshake is completed
           ack = ack + self.nonce
 
@@ -335,14 +340,10 @@ class socket:
             encrypt_key = privateKeys[('*', '*')]
 
           try:
-            print(address[1])
             decrypt_key = publicKeys[('localhost', str(address[1]))]
           except:
             decrypt_key = publicKeys[('*', '*')]
 
-          print("encrypt_key: {}".format(str(encrypt_key)))
-          print("decrypt_key: {}".format(str(decrypt_key)))
-          print("nonce: {}".format(str(self.nonce)))
 
           self.box = Box(encrypt_key, decrypt_key)
 
@@ -385,14 +386,19 @@ class socket:
         else:
           seq_num = header[8]
           ack_num = header[9]
-          payload = data 
+          
+          if(self.encrypt):
+            print("Decrypting Packet " + str(self.seq_num))
+            data = self.box.decrypt(data)
+
+
           if (seq_num != self.seq_num) or payload_len != header[11]: # if ack is dropped or packet is malformed
             self.seq_num = seq_num + 1
             reset_packet = self.packet_format.pack(1, 8, 0, 0, 40, 0, 0, 0, ack_num, seq_num, 0, 0)
             rx_socket.sendto(reset_packet, address)            # send reset (RST) packet with sequence nubmer
 
           else:
-            print("sending ack for packet " + str(self.seq_num))
+            print("Sending ack for packet " + str(self.seq_num))
             self.current_buffer = data
             self.seq_num = seq_num + 1
             ack = self.packet_format.pack(1, 0, 0, 0, 40, 0, 0, 0, ack_num + 1, seq_num, 0, 0)
