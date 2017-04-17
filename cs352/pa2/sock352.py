@@ -1,4 +1,10398 @@
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
 
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
+
+import binascii
+import socket as syssock
+import struct
+import sys
+import time
+import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
+
+
+# this init function is global clto the class and
+# defines the UDP ports all messages are sent
+# and received from.
+def init(UDPportTx,UDPportRx):   # initialize your UDP socket here
+    # create a UDP/datagram socket 
+    global rx_port
+    global rx_socket
+    global tx_port
+
+    rx_port = int(UDPportRx)
+    rx_socket = syssock.socket(syssock.AF_INET, syssock.SOCK_DGRAM)
+    rx_socket.bind(('', rx_port))
+    tx_port = int(UDPportTx)
+
+def readKeyChain(filename):
+    global publicKeysHex
+    global privateKeysHex 
+    global publicKeys
+    global privateKeys 
+    
+    if (filename):
+        try:
+            keyfile_fd = open(filename,"r")
+            for line in keyfile_fd:
+                words = line.split()
+                # check if a comment
+                # more than 2 words, and the first word does not have a
+                # hash, we may have a valid host/key pair in the keychain
+                if ( (len(words) >= 4) and (words[0].find("#") == -1)):
+                    host = words[1]
+                    port = words[2]
+                    keyInHex = words[3]
+                    if (words[0] == "private"):
+                        privateKeysHex[(host,port)] = keyInHex
+                        privateKeys[(host,port)] = nacl.public.PrivateKey(keyInHex, nacl.encoding.HexEncoder)
+                    elif (words[0] == "public"):
+                        publicKeysHex[(host,port)] = keyInHex
+                        publicKeys[(host,port)] = nacl.public.PublicKey(keyInHex, nacl.encoding.HexEncoder)
+        except Exception,e:
+            print ( "error: opening keychain file: %s %s" % (filename,repr(e)))
+    else:
+            print ("error: No filename presented")             
+
+    return (publicKeys,privateKeys)
+
+    
+class socket:
+    
+    def __init__(self):
+        self.seq_num = -1 # sequence number for packet which has been received last
+        self.ack_num = -1
+        self.connected = False # if handshake completed, set to true
+        self.current_buffer = None
+        self.client_closed = False
+        self.packet_format = struct.Struct('!BBHQQL')
+        self.address = None 
+        self.client = False
+        self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
+
+    def bind(self,address):
+      # null function for part 1 
+        return 
+
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
+        global tx_port
+        
+        address = args[0]
+        self.address = address[0] 
+        self.client = True
+
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
+        
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
+
+
+      
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+      
+
+    
+    def listen(self,backlog):
+        return
+
+    def accept(self):
+        self.server = True
+        while True:
+          self.__sock352_get_packet()
+          if self.connected == True:
+            return (self, tx_port)
+          
+  
+    def close(self):   # fill in your code here
+        # send a FIN packet (flags with FIN bit set)
+        # remove the connection from the list of connections
+
+
+        if self.client_closed == False and self.server == True:
+          while self.client_closed == False:
+            self.__sock352_get_packet()
+          self.close()
+
+
+        if self.client:
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              final_packet = self.packet_format.pack(1, 2, 0, 0, 0, 0)
+              rx_socket.sendto(final_packet, (self.address, tx_port))
+
+              final_ack = rx_socket.recv(1096)
+              final_ack = self.packet_format.unpack(final_ack)
+              
+              if final_ack[1] == 2:
 import binascii
 import socket as syssock
 import struct
