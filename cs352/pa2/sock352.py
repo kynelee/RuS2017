@@ -1,5 +1,3 @@
-# this pseudo-code shows an example strategy for implementing
-# the CS 352 socket library 
 
 import binascii
 import socket as syssock
@@ -7,6 +5,44 @@ import struct
 import sys
 import time
 import random
+
+# encryption libraries 
+import nacl.utils
+import nacl.secret
+import nacl.utils
+from nacl.public import PrivateKey, Box
+
+# if you want to debug and print the current stack frame 
+from inspect import currentframe, getframeinfo
+
+# these are globals to the sock352 class and
+# define the UDP ports all messages are sent
+# and received from
+
+# the ports to use for the sock352 messages 
+global sock352portTx
+global sock352portRx
+# the public and private keychains in hex format 
+global publicKeysHex
+global privateKeysHex
+
+# the public and private keychains in binary format 
+global publicKeys
+global privateKeys
+
+# the encryption flag 
+global ENCRYPT
+
+publicKeysHex = {} 
+privateKeysHex = {} 
+publicKeys = {} 
+privateKeys = {}
+
+# this is 0xEC 
+ENCRYPT = 236 
+
+# this is the structure of the sock352 packet 
+sock352HdrStructStr = '!BBBBHHLLQQLL'
 
 
 # this init function is global clto the class and
@@ -67,46 +103,92 @@ class socket:
         self.address = None 
         self.client = False
         self.server = False
+        self.encrypt = False
+        self.encrypt_key = None
+        self.decrypt_key = None 
 
     def bind(self,address):
       # null function for part 1 
         return 
 
-    def connect(self,address):  # fill in your code here
+    def connect(self,*args):  # fill in your code here
+        # Check publicKeys and privateKeys to check for matching host and
+        # port
+        # Create nonce
+        # Find Keys
+        # Create Box Object:
+
+        global ENCRYPT
+        global rx_port
         global tx_port
+        
+        address = args[0]
         self.address = address[0] 
         self.client = True
 
-        init_sequence_no = random.randint(1,100) 
-        init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+        if (len(args) >=1): # No Encrpytion
+          init_sequence_no = random.randint(1,100) 
+          init_packet = self.packet_format.pack(1, 1, 24, init_sequence_no, 0, 0)
+          
+          while True:
+            try:
+              rx_socket.settimeout(.2)
+              rx_socket.sendto(init_packet, (self.address, tx_port))
+
+              print("Sending init packet with sequence number + " + str(init_sequence_no))
+              print(tx_port)
+
+              ack = rx_socket.recv(4096) # Received ack from server
+              ack = self.packet_format.unpack(ack)
+
+              print("Received ack packet " + str(ack))
+
+              client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
+              rx_socket.sendto(client_ack, (self.address, tx_port))
+
+              print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
+
+              self.seq_num = ack[4]
+              self.ack_num = ack[3]
+              rx_socket.settimeout(None)
+
+              print("connected")
+              break
+
+            except syssock.timeout:
+              continue
+
+
+        elif (len(args) >=2):  
+          if (args[0] == ENCRYPT):
+            self.encrypt = True
+
+
+          # rx port and address represents client, address represents server
         
-        while True:
-          try:
-            rx_socket.settimeout(.2)
-            rx_socket.sendto(init_packet, (self.address, tx_port))
+          encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+          decrypt_key = publicKeys[address]
 
-            print("Sending init packet with sequence number + " + str(init_sequence_no))
-            print(tx_port)
 
-            ack = rx_socket.recv(4096) # Received ack from server
-            ack = self.packet_format.unpack(ack)
+      
 
-            print("Received ack packet " + str(ack))
 
-            client_ack = self.packet_format.pack(1, 0, 24, ack[4], int(ack[3]) + 1, 0) # Send final client ack
-            rx_socket.sendto(client_ack, (self.address, tx_port))
 
-            print("Sending final client ack " + str((1, 0, 24, ack[4], int(ack[3]) + 1, 0)))
 
-            self.seq_num = ack[4]
-            self.ack_num = ack[3]
-            rx_socket.settimeout(None)
 
-            print("connected")
-            break
 
-          except syssock.timeout:
-            continue
+
+
+
+
+          
+
+
+
+
+
+
+      
 
     
     def listen(self,backlog):

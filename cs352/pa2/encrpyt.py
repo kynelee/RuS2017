@@ -92,4 +92,4 @@ alice_box = Box(skalice, pkbob)
 #   tampered with or there was otherwise an error.
 plaintext = alice_box.decrypt(encrypted)
 
-        print ("the plaintext is: %s" %(plaintext))
+print ("the plaintext is: %s" %(plaintext))
