@@ -50,8 +50,8 @@
 ;; -----------------------------------------------------
 ;; EXAMPLE KEY VALUES
 ;;  (key '(h e l l o))       = 106402241991
-(display (key '(h e l l o))) (newline)
-(display (key '(m a y))) (newline)
+;;(display (key '(h e l l o))) (newline)
+;;(display (key '(m a y))) (newline)
 ;;   (key '(m a y))           = 126526810
 ;;   (key '(t r e e f r o g)) = 2594908189083745
 
@@ -61,8 +61,11 @@
 ;; value of parameter "size" should be a prime number
 (define gen-hash-division-method
   (lambda (size) ;; range of values: 0..size-1
-     'SOME_CODE_GOES_HERE ;; *** FUNCTION BODY IS MISSING ***
-))
+    (lambda (x) 
+     (modulo (key x) size)
+    )
+  )
+)
 
 ;; value of parameter "size" is not critical
 ;; Note: hash functions may return integer values in "real"
@@ -70,8 +73,16 @@
 
 (define gen-hash-multiplication-method
   (lambda (size) ;; range of values: 0..size-1
-     'SOME_CODE_GOES_HERE ;; *** FUNCTION BODY IS MISSING ***
-))
+    (lambda (x)
+      (let ((k (key x)))
+      (floor 
+        (*
+          size
+          (- (* k A) (floor (* k A)))
+        )
+      )
+      )
+)))
 
 
 ;; -----------------------------------------------------
@@ -90,7 +101,12 @@
 ;; EXAMPLE HASH VALUES
 ;;   to test your hash function implementation
 ;;
-;;  (hash-1 '(h e l l o))       ==> 35616
+;;(display (hash-2 '(h e l l o))) (newline)
+;;(display (hash-2 '(m a y))) (newline)
+;;(display (hash-2 '(t r e e f r o g))) (newline)
+
+
+;;(hash-1 '(h e l l o))       ==> 35616
 ;;  (hash-1 '(m a y))           ==> 46566
 ;;  (hash-1 '(t r e e f r o g)) ==> 48238
 ;;
