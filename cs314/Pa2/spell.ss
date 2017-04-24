@@ -16,17 +16,42 @@
 ;; *** CODE FOR ANY HELPER FUNCTION GOES HERE ***
 
 
+(define rev
+  (lambda (l)
+    (cond ((null? l) l)
+          ((pair? (car l))(append (rev (cdr l)) (list (rev (car l)))))
+          (else (append (rev (cdr l)) (list (car l))))
+    )
+  )
+)
+
+(define key_helper 
+  (lambda(str val)
+    (if
+      (null? str) val
+      (key_helper 
+           (cdr str) 
+           (+ (ctv (car str)) (* 29 val))
+      )
+    )
+  )
+)
+
 ;; -----------------------------------------------------
 ;; KEY FUNCTION
+;;
 
 (define key
   (lambda (w)
-     'SOME_CODE_GOES_HERE ;; *** FUNCTION BODY IS MISSING ***
+;;    key_helper(rev(w) 5187)
+  (key_helper (rev w) 5187)
 ))
 
 ;; -----------------------------------------------------
 ;; EXAMPLE KEY VALUES
-;;   (key '(h e l l o))       = 106402241991
+;;  (key '(h e l l o))       = 106402241991
+(display (key '(h e l l o))) (newline)
+(display (key '(m a y))) (newline)
 ;;   (key '(m a y))           = 126526810
 ;;   (key '(t r e e f r o g)) = 2594908189083745
 
