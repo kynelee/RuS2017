@@ -8,7 +8,7 @@
 (load "include.ss")
 
 ;; contains simple dictionary definition
-(load "test-dictionary.ss")
+(load "dictionary.ss")
 
 ;; -----------------------------------------------------
 ;; HELPER FUNCTIONS
@@ -16,42 +16,25 @@
 ;; *** CODE FOR ANY HELPER FUNCTION GOES HERE ***
 
 
-(define rev
-  (lambda (l)
-    (cond ((null? l) l)
-          ((pair? (car l))(append (rev (cdr l)) (list (rev (car l)))))
-          (else (append (rev (cdr l)) (list (car l))))
-    )
-  )
-)
-
-(define key_helper 
-  (lambda(str val)
-    (if
-      (null? str) val
-      (key_helper 
-           (cdr str) 
-           (+ (ctv (car str)) (* 29 val))
-      )
-    )
+(define compute 
+  (lambda (char val)
+    (+ (ctv char) (* 29 val))
   )
 )
 
 ;; -----------------------------------------------------
 ;; KEY FUNCTION
 ;;
+;;
 
 (define key
   (lambda (w)
-;;    key_helper(rev(w) 5187)
-  (key_helper (rev w) 5187)
+    (reduce compute w 5187)
 ))
 
 ;; -----------------------------------------------------
 ;; EXAMPLE KEY VALUES
-;;  (key '(h e l l o))       = 106402241991
-;;(display (key '(h e l l o))) (newline)
-;;(display (key '(m a y))) (newline)
+;  (key '(h e l l o))       = 106402241991
 ;;   (key '(m a y))           = 126526810
 ;;   (key '(t r e e f r o g)) = 2594908189083745
 
@@ -75,12 +58,12 @@
   (lambda (size) ;; range of values: 0..size-1
     (lambda (x)
       (let ((k (key x)))
-      (floor 
-        (*
-          size
-          (- (* k A) (floor (* k A)))
+        (floor 
+          (*
+            size
+            (- (* k A) (floor (* k A)))
+          )
         )
-      )
       )
 )))
 
@@ -101,10 +84,6 @@
 ;; EXAMPLE HASH VALUES
 ;;   to test your hash function implementation
 ;;
-;;(display (hash-2 '(h e l l o))) (newline)
-;;(display (hash-2 '(m a y))) (newline)
-;;(display (hash-2 '(t r e e f r o g))) (newline)
-
 
 ;;(hash-1 '(h e l l o))       ==> 35616
 ;;  (hash-1 '(m a y))           ==> 46566
@@ -126,10 +105,49 @@
 ;; -----------------------------------------------------
 ;; SPELL CHECKER GENERATOR
 
+
+;; generates bit vector
+(define gen-vector
+  (lambda (hashfunctionlist vec dict)
+    (if (null? hashfunctionlist) vec
+    (append vec (map (car hashfunctionlist) dict) (gen-vector (cdr hashfunctionlist) vec dict))
+    )
+  )
+)
+
+;; checks a word for all hash functions
+(define check-word
+  (lambda (word hashfunctionlist vec)
+    (cond ((null? hashfunctionlist) #t)
+          ((find-word ((car hashfunctionlist) word) vec) (check-word word (cdr hashfunctionlist) vec))
+          (else #f)
+    )
+  )
+)
+
+;; Finds a word in the bit vector, given its key
+(define find-word 
+  (lambda (word vec)
+    (cond ((null? vec) #f)
+          ((= (floor word) (floor (car vec))) #t)
+          (else (find-word word (cdr vec)))
+    )
+  )
+)
+
+;; returns a function which spellchecks for all hash functions for a given
+;; dict
 (define gen-checker
   (lambda (hashfunctionlist dict)
-     'SOME_CODE_GOES_HERE ;; *** FUNCTION BODY IS MISSING ***
-))
+    (lambda (word) 
+      (check-word 
+        word 
+        hashfunctionlist 
+        (gen-vector hashfunctionlist '() dict)
+        )
+    )
+  )
+)
 
 
 ;; -----------------------------------------------------
@@ -141,7 +159,6 @@
 
 ;; EXAMPLE APPLICATIONS OF A SPELL CHECKER
 ;;
-;;  (checker-1 '(a r g g g g)) ==> #f
-;;  (checker-2 '(h e l l o)) ==> #t
+;; (checker-1 '(a b s o l v e d e d))
+;; (checker-2 '(h e l l o))
 ;;  (checker-2 '(a r g g g g)) ==> #t  // false positive
-
