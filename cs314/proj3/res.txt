@@ -1,0 +1,223 @@
+
+Graph: graphs/amazon.txt, Method: BMF Shared, Block Configuration:(512 4)
+Time: 553.993
+Iterations:41
+
+Graph: graphs/amazon.txt, Method: BMF outcore yes, Block Configuration: (512 4)
+Time: 461.568
+Iterations:41
+
+Graph: graphs/amazon.txt, Method: BMF incore yes, Block Configuration: (512 4)
+Time: 311.429
+Iterations:28
+
+Graph: graphs/amazon.txt, Method: TPE outcore yes, Block Configuration: (512 4)
+K_time: 19, F_Time:757, T_time: 776
+Iterations:41
+
+Graph: graphs/amazon.txt, Method: TPE incore yes, Block Configuration: (512 4)
+K_time: 18, F_Time:750, T_time: 768
+Iterations:41
+
+Graph: graphs/amazon.txt, Method: BMF outcore no, Block Configuration: (512 4)
+Time: 460.613
+Iterations:41
+
+Graph: graphs/amazon.txt, Method: BMF incore no, Block Configuration: (512 4)
+Time: 165.595
+Iterations:14
+
+Graph: graphs/amazon.txt, Method: TPE outcore no, Block Configuration: (512 4)
+K_time: 17, F_Time:755, T_time: 772
+Iterations:41
+
+Graph: graphs/amazon.txt, Method: TPE incore no, Block Configuration: (512 4)
+K_time: 21, F_Time:663, T_time: 684
+Iterations:36
+
+
+
+Graph: graphs/msdoor.txt, Method: BMF Shared, Block Configuration:(512 4)
+Time: 52531.3
+Iterations:983
+
+Graph: graphs/msdoor.txt, Method: BMF outcore yes, Block Configuration: (512 4)
+Time: 35129
+Iterations:983
+
+Graph: graphs/msdoor.txt, Method: BMF incore yes, Block Configuration: (512 4)
+Time: 13744.3
+Iterations:380
+
+Graph: graphs/msdoor.txt, Method: TPE outcore yes, Block Configuration: (512 4)
+K_time: 3167, F_Time:44043, T_time: 47210
+Iterations:983
+
+Graph: graphs/msdoor.txt, Method: TPE incore yes, Block Configuration: (512 4)
+K_time: 700, F_Time:41719, T_time: 42419
+Iterations:972
+
+Graph: graphs/msdoor.txt, Method: BMF outcore no, Block Configuration: (512 4)
+Time: 34838.7
+Iterations:983
+
+Graph: graphs/msdoor.txt, Method: BMF incore no, Block Configuration: (512 4)
+Time: 14148.4
+Iterations:391
+
+Graph: graphs/msdoor.txt, Method: TPE outcore no, Block Configuration: (512 4)
+K_time: 3138, F_Time:43719, T_time: 46857
+Iterations:983
+
+Graph: graphs/msdoor.txt, Method: TPE incore no, Block Configuration: (512 4)
+K_time: 1125, F_Time:41830, T_time: 42955
+Iterations:968
+
+
+
+Graph: graphs/google.txt, Method: BMF Shared, Block Configuration:(512 4)
+Time: 972.123
+Iterations:32
+
+Graph: graphs/google.txt, Method: BMF outcore yes, Block Configuration: (512 4)
+Time: 909.681
+Iterations:32
+
+Graph: graphs/google.txt, Method: BMF incore yes, Block Configuration: (512 4)
+Time: 518.395
+Iterations:18
+
+Graph: graphs/google.txt, Method: TPE outcore yes, Block Configuration: (512 4)
+K_time: 47, F_Time:1637, T_time: 1684
+Iterations:32
+
+Graph: graphs/google.txt, Method: TPE incore yes, Block Configuration: (512 4)
+K_time: 46, F_Time:1578, T_time: 1624
+Iterations:31
+
+Graph: graphs/google.txt, Method: BMF outcore no, Block Configuration: (512 4)
+Time: 907.489
+Iterations:32
+
+Graph: graphs/google.txt, Method: BMF incore no, Block Configuration: (512 4)
+Time: 437.843
+Iterations:15
+
+Graph: graphs/google.txt, Method: TPE outcore no, Block Configuration: (512 4)
+K_time: 47, F_Time:1636, T_time: 1683
+Iterations:32
+
+Graph: graphs/google.txt, Method: TPE incore no, Block Configuration: (512 4)
+K_time: 50, F_Time:1481, T_time: 1531
+Iterations:29
+
+
+Graph: graphs/roadnetca.txt, Method: BMF Shared, Block Configuration:(512 4)
+Time: 9092.21
+Iterations:554
+
+Graph: graphs/roadnetca.txt, Method: BMF outcore yes, Block Configuration: (512 4)
+Time: 6773.66
+Iterations:554
+
+Graph: graphs/roadnetca.txt, Method: BMF incore yes, Block Configuration: (512 4)
+Time: 4577.49
+Iterations:405
+
+Graph: graphs/roadnetca.txt, Method: TPE outcore yes, Block Configuration: (512 4)
+K_time: 9, F_Time:8864, T_time: 8873
+Iterations:554
+
+Graph: graphs/roadnetca.txt, Method: TPE incore yes, Block Configuration: (512 4)
+K_time: 10, F_Time:8328, T_time: 8338
+Iterations:554
+
+Graph: graphs/roadnetca.txt, Method: BMF outcore no, Block Configuration: (512 4)
+Time: 6633.86
+Iterations:554
+
+Graph: graphs/roadnetca.txt, Method: BMF incore no, Block Configuration: (512 4)
+Time: 4142.75
+Iterations:364
+
+Graph: graphs/roadnetca.txt, Method: TPE outcore no, Block Configuration: (512 4)
+K_time: 9, F_Time:8865, T_time: 8874
+Iterations:554
+
+Graph: graphs/roadnetca.txt, Method: TPE incore no, Block Configuration: (512 4)
+K_time: 10, F_Time:8371, T_time: 8381
+Iterations:554
+
+
+Graph: graphs/soclivejournal.txt, Method: BMF Shared, Block Configuration:(512 4)
+Time: 4832.49
+Iterations:14
+
+Graph: graphs/soclivejournal.txt, Method: BMF outcore yes, Block Configuration: (512 4)
+Time: 4259.76
+Iterations:14
+
+Graph: graphs/soclivejournal.txt, Method: BMF incore yes, Block Configuration: (512 4)
+Time: 2841.58
+Iterations:9
+
+Graph: graphs/soclivejournal.txt, Method: TPE outcore yes, Block Configuration: (512 4)
+K_time: 573, F_Time:7326, T_time: 7899
+Iterations:14
+
+Graph: graphs/soclivejournal.txt, Method: TPE incore yes, Block Configuration: (512 4)
+K_time: 587, F_Time:7306, T_time: 7893
+Iterations:14
+
+Graph: graphs/soclivejournal.txt, Method: BMF outcore no, Block Configuration: (512 4)
+Time: 4289.12
+Iterations:14
+
+Graph: graphs/soclivejournal.txt, Method: BMF incore no, Block Configuration: (512 4)
+Time: 2299.33
+Iterations:7
+
+Graph: graphs/soclivejournal.txt, Method: TPE outcore no, Block Configuration: (512 4)
+K_time: 575, F_Time:7331, T_time: 7906
+Iterations:14
+
+Graph: graphs/soclivejournal.txt, Method: TPE incore no, Block Configuration: (512 4)
+K_time: 729, F_Time:5280, T_time: 6009
+Iterations:10
+
+Graph: graphs/road-cal.txt, Method: BMF Shared, Block Configuration:(512 4)
+Time: 60602.7
+Iterations:4164
+
+Graph: graphs/road-cal.txt, Method: BMF outcore yes, Block Configuration: (512 4)
+Time: 48880.6
+Iterations:4164
+
+Graph: graphs/road-cal.txt, Method: BMF incore yes, Block Configuration: (512 4)
+Time: 24536.8
+Iterations:2263
+
+Graph: graphs/road-cal.txt, Method: TPE outcore yes, Block Configuration: (512 4)
+K_time: 6790, F_Time:68274, T_time: 75064
+Iterations:4164
+
+Graph: graphs/road-cal.txt, Method: TPE incore yes, Block Configuration: (512 4)
+K_time: 2334, F_Time:63999, T_time: 66333
+Iterations:4150
+
+Graph: graphs/road-cal.txt, Method: BMF outcore no, Block Configuration: (512 4)
+Time: 48613.9
+Iterations:4164
+
+Graph: graphs/road-cal.txt, Method: BMF incore no, Block Configuration: (512 4)
+Time: 28097.5
+Iterations:2612
+
+Graph: graphs/road-cal.txt, Method: TPE outcore no, Block Configuration: (512 4)
+K_time: 6805, F_Time:68104, T_time: 74909
+Iterations:4164
+
+Graph: graphs/road-cal.txt, Method: TPE incore no, Block Configuration: (512 4)
+K_time: 2339, F_Time:63740, T_time: 66079
+Iterations:4148
+
