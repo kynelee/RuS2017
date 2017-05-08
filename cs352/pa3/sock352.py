@@ -172,12 +172,13 @@ class socket:
 
         
           try: 
-            encrypt_key = privateKeys[('localhost', rx_port)] # retrieve clients private key used to encrypt messages 
+            encrypt_key = privateKeys[('localhost', str(rx_port))] # retrieve clients private key used to encrypt messages 
           except:
             encrypt_key = privateKeys[('*', '*')]
 
           try:
-            decrypt_key = publicKeys[address]
+            decrypt_key = publicKeys[(self.address, str(tx_port))]
+
           except:
             decrypt_key = publicKeys[('*', '*')]
 
